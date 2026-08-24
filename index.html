@@ -77,13 +77,13 @@ let gameState='menu';
 let score=0,highScore=+localStorage.getItem('burgerHS')||0,lives=3;
 
 // ── Weapon ────────────────────────────────────────────────────────────────────
-let weaponTier=0,killCount=0,cardsThisRound=0;
+let weaponTier=0,killCount=0,cardsThisRound=0,missileCharges=0,totalCardsEver=0;
 
 // ── Player ────────────────────────────────────────────────────────────────────
 const P={x:W/2,y:H-85,w:72,h:72,speed:6,cooldown:0,inv:0};
 
 // ── Collections ───────────────────────────────────────────────────────────────
-let bullets=[],eBullets=[],enemies=[],particles=[],floatTexts=[],powerCards=[];
+let bullets=[],eBullets=[],enemies=[],particles=[],floatTexts=[],powerCards=[],missiles=[];
 
 // ── Wave movement ─────────────────────────────────────────────────────────────
 let eDir=1,eMoveTimer=0,eMoveInterval=52,eShootTimer=0;
@@ -137,7 +137,7 @@ document.addEventListener('keydown',e=>{
     else if(gameState==='gameover'||gameState==='win')gameState='menu';
   }
   if(e.key==='p'||e.key==='P'||e.key==='Escape')togglePause();
-  if(e.key==='m'||e.key==='M')toggleMute();
+  if(e.key==='m'||e.key==='M')toggleMute();if(e.key==='z'||e.key==='Z')fireMissile();
 });
 document.addEventListener('keyup',e=>{keys[e.key]=false;});
 // ג”€ג”€ Audio ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -237,14 +237,15 @@ function explode(x,y,n){
 // ── Start / Spawn ─────────────────────────────────────────────────────────────
 function startGame(){
   gameState='playing';score=0;lives=3;stageIdx=0;
-  weaponTier=0;killCount=0;cardsThisRound=0;
+  weaponTier=0;killCount=0;cardsThisRound=0;missileCharges=0;totalCardsEver=0;
   P.x=W/2;P.cooldown=0;P.inv=0;
-  boss=null;bossTime=0;bossQuote='';bossQuoteTimer=0;enemies=[];bullets=[];eBullets=[];particles=[];floatTexts=[];powerCards=[];stopMusic();
+  boss=null;bossTime=0;bossQuote='';bossQuoteTimer=0;enemies=[];bullets=[];eBullets=[];particles=[];floatTexts=[];powerCards=[];missiles=[];stopMusic();
   spawnWave(1);startMusic();
 }
 
-function spawnWave(num){
-  enemies=[];bullets=[];eBullets=[];powerCards=[];
+function sndMissileFire(){try{const ac=getAC();const o=ac.createOscillator(),g=ac.createGain();o.type='sawtooth';o.frequency.setValueAtTime(80,ac.currentTime);o.frequency.exponentialRampToValueAtTime(220,ac.currentTime+0.3);g.gain.setValueAtTime(0.45,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.38);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+0.4);const sz=Math.floor(ac.sampleRate*0.28);const buf=ac.createBuffer(1,sz,ac.sampleRate);const d=buf.getChannelData(0);for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;const src=ac.createBufferSource();src.buffer=buf;const flt=ac.createBiquadFilter();flt.type='bandpass';flt.frequency.value=500;const gn=ac.createGain();gn.gain.setValueAtTime(0.25,ac.currentTime);gn.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.28);src.connect(flt);flt.connect(gn);gn.connect(ac.destination);src.start();src.stop(ac.currentTime+0.3);}catch(e){}}
+function fireMissile(){if(missileCharges<=0||!boss||gameState!=='boss')return;missileCharges--;missiles.push({x:P.x,y:P.y-P.h/2,age:0});sndMissileFire();}function spawnWave(num){
+  enemies=[];bullets=[];eBullets=[];powerCards=[];missiles=[];
   const rows=Math.min(2+num,5),cols=Math.min(6+num,11);
   const ew=54,eh=46,gx=16,gy=16;
   const sx=(W-cols*(ew+gx))/2;
@@ -257,7 +258,7 @@ function spawnWave(num){
 }
 
 function spawnBossStage(num){
-  enemies=[];bullets=[];eBullets=[];powerCards=[];
+  enemies=[];bullets=[];eBullets=[];powerCards=[];missiles=[];
   eShootTimer=0;bossTime=0;
   const bw=150,bh=220;
   const maxHp=num===1?65:110;
@@ -318,7 +319,7 @@ function onEnemyKilled(e){
 
 function collectCard(c){
   c.collected=true;
-  sndPokemon();cardsThisRound=Math.min(cardsThisRound+1,2);
+  sndPokemon();cardsThisRound=Math.min(cardsThisRound+1,2);totalCardsEver++;if(totalCardsEver%5===0){missileCharges++;floatTexts.push({x:W/2,y:H/2-60,text:'MISSILE READY!',life:100,maxLife:100,big:true});}
   lives=3;weaponTier=cardsThisRound;
   const msgs=['','POWER UP! x2 LASER + 3 LIVES!','ULTRA LASER ACTIVATED!'];
   floatTexts.push({x:W/2,y:H/2-30,text:msgs[cardsThisRound],life:130,maxLife:130,big:true});
@@ -372,6 +373,7 @@ function update(){
     if(!c.collected&&Math.abs(c.x-P.x)<42&&Math.abs(c.y-P.y)<52)collectCard(c);
   });
   powerCards=powerCards.filter(c=>c.life>0&&!c.collected);
+  missiles=missiles.filter(m=>{m.y-=14;m.age++;if(m.y+36<0)return false;if(boss&&m.x>boss.x&&m.x<boss.x+boss.w&&m.y<boss.y+boss.h&&m.y+36>boss.y){const dmg=Math.floor(boss.maxHp/3);boss.hp-=dmg;floatTexts.push({x:boss.x+boss.w/2,y:boss.y,text:'MISSILE! -'+dmg+'HP',life:80,maxLife:80,big:true});triggerShake(25,10);explode(m.x,boss.y+boss.h/3,35);sndBossDeath();if(boss.hp<=0){explode(boss.x+boss.w/2,boss.y+boss.h/2,65);triggerShake(40,12);score+=500;if(score>highScore){highScore=score;localStorage.setItem('burgerHS',highScore);}boss=null;enemies=[];stopMusic();clearBannerText='ITZIK DEFEATED! +500 BONUS!';waveClearTimer=WAVE_CLEAR_DUR+60;gameState='bossclear';}return false;}return true;});
 
   if(gameState==='waveclear'||gameState==='bossclear'){
     if(--waveClearTimer<=0)advanceStage();
@@ -616,6 +618,7 @@ function drawScene(){
     ctx.fillRect(b.x-bW[t]/2,b.y,bW[t],bH[t]);ctx.shadowBlur=0;
   });
 
+  missiles.forEach(m=>{ctx.save();const fl=Math.random()*8+6;const flg=ctx.createLinearGradient(m.x,m.y+28,m.x,m.y+28+fl);flg.addColorStop(0,'rgba(255,180,0,0.9)');flg.addColorStop(1,'rgba(255,60,0,0)');ctx.fillStyle=flg;ctx.beginPath();ctx.ellipse(m.x,m.y+30,5,fl,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#cccccc';ctx.fillRect(m.x-5,m.y,10,28);ctx.fillStyle='#ff3300';ctx.beginPath();ctx.moveTo(m.x-5,m.y);ctx.lineTo(m.x+5,m.y);ctx.lineTo(m.x,m.y-12);ctx.closePath();ctx.fill();ctx.fillStyle='#999';ctx.beginPath();ctx.moveTo(m.x-5,m.y+18);ctx.lineTo(m.x-10,m.y+28);ctx.lineTo(m.x-5,m.y+28);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(m.x+5,m.y+18);ctx.lineTo(m.x+10,m.y+28);ctx.lineTo(m.x+5,m.y+28);ctx.closePath();ctx.fill();ctx.restore();});
   // Enemy bullets
   eBullets.forEach(b=>{
     ctx.fillStyle='#ff3333';ctx.shadowColor='#ff3333';ctx.shadowBlur=8;
@@ -687,6 +690,7 @@ function drawHUD(){
     ctx.textAlign='center';ctx.fillStyle='#aaa';ctx.font='13px Arial';
     ctx.fillText('Next card in '+nextCard+' kills',W/2,56);
   }
+  if(missileCharges>0){ctx.textAlign='center';ctx.fillStyle='#ff8800';ctx.font='bold 15px Arial';ctx.shadowColor='#ff4400';ctx.shadowBlur=10;ctx.fillText('MISSILE x'+missileCharges+' [Z]',W/2,76);ctx.shadowBlur=0;}
 }
 
 function drawBossEnterBanner(){
@@ -753,6 +757,6 @@ function loop(){update();draw();requestAnimationFrame(loop);}
   loop();
 })();
 </script>
-<div id="ctrlBtns" style="position:fixed;bottom:16px;right:16px;z-index:999;display:flex;gap:10px;"><button id="btnMute" onclick="toggleMute()" title="Mute (M)" style="background:rgba(0,0,0,0.75);color:#fff;border:2px solid #666;border-radius:8px;width:48px;height:48px;font-size:18px;cursor:pointer;touch-action:manipulation;">&#128266;</button><button id="btnPause" onclick="togglePause()" title="Pause (P)" style="background:rgba(0,0,0,0.75);color:#fff;border:2px solid #666;border-radius:8px;width:48px;height:48px;font-size:18px;cursor:pointer;touch-action:manipulation;">&#9646;&#9646;</button></div>
+<div id="ctrlBtns" style="position:fixed;bottom:16px;right:16px;z-index:999;display:flex;gap:10px;"><button id="btnMute" onclick="toggleMute()" title="Mute (M)" style="background:rgba(0,0,0,0.75);color:#fff;border:2px solid #666;border-radius:8px;width:48px;height:48px;font-size:18px;cursor:pointer;touch-action:manipulation;">&#128266;</button><button id="btnPause" onclick="togglePause()" title="Pause (P)" style="background:rgba(0,0,0,0.75);color:#fff;border:2px solid #666;border-radius:8px;width:48px;height:48px;font-size:18px;cursor:pointer;touch-action:manipulation;">&#9646;&#9646;</button><button onclick="fireMissile()" title="Missile (Z)" style="background:rgba(0,0,0,0.75);color:#fff;border:2px solid #ff8800;border-radius:8px;width:48px;height:48px;font-size:22px;cursor:pointer;touch-action:manipulation;">&#128640;</button></div>
 </body>
 </html>
