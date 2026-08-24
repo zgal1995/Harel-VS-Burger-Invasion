@@ -90,6 +90,34 @@ let eDir=1,eMoveTimer=0,eMoveInterval=52,eShootTimer=0;
 
 // ── Boss ──────────────────────────────────────────────────────────────────────
 let boss=null,bossTime=0;
+let bossQuote='',bossQuoteTimer=0;
+const bossEnterQuotes=["\u05ea\u05d1\u05d5\u05d0 \u05d0\u05d9\u05ea\u05d9 \u05dc\u05e1\u05ea\u05d9\u05d5 \u05d5\u05e8\u05d6, \u05d0\u05e8\u05d0\u05d4 \u05dc\u05da \u05de\u05d4 \u05d6\u05d4 \u05d0\u05d9\u05de\u05d5\u05df \u05d0\u05de\u05d9\u05ea\u05d9","\u05d1\u05d5\u05d0 \u05de\u05d9\u05e8\u05d5\u05e5 \u05e2\u05d3 \u05dc\u05e2\u05e5, \u05d9\u05d0 \u05e7\u05d1\u05d1"];
+const bossPhaseQuotes=["\u05e7\u05dc\u05e4 \u05e4\u05d5\u05e7\u05d9\u05de\u05d5\u05df \u05d1\u05d0\u05dc\u05e3 \u05e9\u05e7\u05dc?!?!","\u05e2\u05d5\u05d3 \u05e4\u05e2\u05dd \u05e2\u05e9\u05d9\u05ea \u05ea\u05d0\u05d5\u05e0\u05d4 \u05d4\u05e8\u05d0\u05dc?","\u05ea\u05d1\u05d5\u05d0 \u05d0\u05d9\u05ea\u05d9 \u05dc\u05e1\u05ea\u05d9\u05d5 \u05d5\u05e8\u05d6, \u05d0\u05e8\u05d0\u05d4 \u05dc\u05da \u05de\u05d4 \u05d6\u05d4 \u05d0\u05d9\u05de\u05d5\u05df \u05d0\u05de\u05d9\u05ea\u05d9","\u05d0\u05d9 \u05d0\u05e4\u05e9\u05e8 \u05dc\u05e0\u05e6\u05d7 \u05d8\u05d5\u05d9\u05d5\u05d8\u05d4"];
+function setBossQuote(txt){bossQuote=txt;bossQuoteTimer=200;}
+function drawBossQuote(){
+  if(!boss||bossQuoteTimer<=0||!bossQuote)return;
+  bossQuoteTimer--;
+  const alpha=Math.min(1,bossQuoteTimer/25);
+  ctx.save();ctx.globalAlpha=alpha;
+  ctx.font='bold 15px Arial';
+  const tw=ctx.measureText(bossQuote).width+24;
+  const th=30;
+  const cx=Math.max(tw/2+5,Math.min(W-tw/2-5,boss.x+boss.w/2));
+  const ty=Math.max(th+14,boss.y-6);
+  const bx0=cx-tw/2,bx1=cx+tw/2,by0=ty-th,by1=ty,r=7;
+  ctx.fillStyle='#fffbe6';ctx.strokeStyle='#ff8800';ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(bx0+r,by0);ctx.lineTo(bx1-r,by0);ctx.quadraticCurveTo(bx1,by0,bx1,by0+r);
+  ctx.lineTo(bx1,by1-r);ctx.quadraticCurveTo(bx1,by1,bx1-r,by1);
+  const tx=Math.max(bx0+10,Math.min(bx1-10,boss.x+boss.w/2));
+  ctx.lineTo(tx+7,by1);ctx.lineTo(tx,by1+10);ctx.lineTo(tx-7,by1);
+  ctx.lineTo(bx0+r,by1);ctx.quadraticCurveTo(bx0,by1,bx0,by1-r);
+  ctx.lineTo(bx0,by0+r);ctx.quadraticCurveTo(bx0,by0,bx0+r,by0);
+  ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.fillStyle='#222';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(bossQuote,cx,by0+th/2);
+  ctx.restore();
+}
 
 // ── Screen shake ──────────────────────────────────────────────────────────────
 let shakeFrames=0,shakeInt=0,shakeX=0,shakeY=0;
@@ -108,6 +136,8 @@ document.addEventListener('keydown',e=>{
     if(gameState==='menu')startGame();
     else if(gameState==='gameover'||gameState==='win')gameState='menu';
   }
+  if(e.key==='p'||e.key==='P'||e.key==='Escape')togglePause();
+  if(e.key==='m'||e.key==='M')toggleMute();
 });
 document.addEventListener('keyup',e=>{keys[e.key]=false;});
 // ג”€ג”€ Audio ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
@@ -125,6 +155,67 @@ function sndBossDeath(){playNoise(1.1,0.65,140);[0,180,360,540].forEach(t=>setTi
 function sndWaveClear(){try{const ac=getAC();[[330,0,0.22],[392,0.2,0.22],[523,0.42,0.35]].forEach(([f,t,d])=>{const o=ac.createOscillator();const g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0.22,ac.currentTime+t);g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+t+d);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+d+0.01);});}catch(e){}}
 function sndGameOver(){try{const ac=getAC();[[440,0,0.32],[330,0.28,0.32],[220,0.58,0.32],[110,0.9,0.55]].forEach(([f,t,d])=>{const o=ac.createOscillator();const g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type='sawtooth';o.frequency.value=f;g.gain.setValueAtTime(0.28,ac.currentTime+t);g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+t+d);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+d+0.01);});}catch(e){}}
 function sndWin(){try{const ac=getAC();[[262,0],[330,0.15],[392,0.3],[523,0.46],[392,0.62],[330,0.78],[523,0.95]].forEach(([f,t])=>{const o=ac.createOscillator();const g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0.22,ac.currentTime+t);g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+t+0.18);o.start(ac.currentTime+t);o.stop(ac.currentTime+t+0.2);});}catch(e){}}
+// ג”€ Music + Mute/Pause ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+let muted=false,prevGameState='';
+let musicPlaying=false,musicScheduler=null,musicNextBeat=0,musicStep=0;
+const BPM=145,stepDur=60/BPM/4;
+const kPat=[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0];
+const sPat=[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0];
+const hPat=[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1];
+const bPat=[110,0,0,0,0,0,82,0,110,0,0,82,0,0,98,0];
+const lPat=[330,0,0,0,294,0,0,0,330,0,0,0,392,0,0,0];
+function mKick(t){try{const ac=getAC();const o=ac.createOscillator();const g=ac.createGain();o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(0.001,t+0.35);g.gain.setValueAtTime(1.0,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.4);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+0.45);}catch(e){}}
+function mSnare(t){try{const ac=getAC();const sz=Math.floor(ac.sampleRate*0.1);const b=ac.createBuffer(1,sz,ac.sampleRate);const d=b.getChannelData(0);for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;const s=ac.createBufferSource();s.buffer=b;const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=3000;f.Q.value=0.5;const g=ac.createGain();g.gain.setValueAtTime(0.3,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.1);s.connect(f);f.connect(g);g.connect(ac.destination);s.start(t);s.stop(t+0.12);}catch(e){}}
+function mHihat(t,v){try{const ac=getAC();const sz=Math.floor(ac.sampleRate*0.03);const b=ac.createBuffer(1,sz,ac.sampleRate);const d=b.getChannelData(0);for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;const s=ac.createBufferSource();s.buffer=b;const f=ac.createBiquadFilter();f.type='highpass';f.frequency.value=9000;const g=ac.createGain();g.gain.setValueAtTime(v||0.08,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.03);s.connect(f);f.connect(g);g.connect(ac.destination);s.start(t);s.stop(t+0.04);}catch(e){}}
+function mBass(t,freq){try{const ac=getAC();const o=ac.createOscillator();const g=ac.createGain();o.type='sawtooth';o.frequency.value=freq;g.gain.setValueAtTime(0.2,t);g.gain.exponentialRampToValueAtTime(0.001,t+stepDur*0.8);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+stepDur);}catch(e){}}
+function mLead(t,freq){try{const ac=getAC();const o=ac.createOscillator();const g=ac.createGain();o.type='triangle';o.frequency.value=freq;g.gain.setValueAtTime(0.07,t);g.gain.exponentialRampToValueAtTime(0.001,t+stepDur*3.8);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+stepDur*4);}catch(e){}}
+function schedMusic(){
+  if(!musicPlaying||muted)return;
+  const ac=getAC();
+  while(musicNextBeat<ac.currentTime+0.18){
+    const t=musicNextBeat;
+    if(kPat[musicStep])mKick(t);
+    if(sPat[musicStep])mSnare(t);
+    if(hPat[musicStep])mHihat(t,musicStep%8===0?0.12:0.07);
+    if(bPat[musicStep])mBass(t,bPat[musicStep]);
+    if(lPat[musicStep])mLead(t,lPat[musicStep]);
+    musicStep=(musicStep+1)%16;
+    musicNextBeat+=stepDur;
+  }
+  musicScheduler=setTimeout(schedMusic,20);
+}
+function startMusic(){
+  if(musicPlaying||muted)return;
+  musicPlaying=true;
+  const ac=getAC();
+  if(ac.state==='suspended')ac.resume();
+  musicNextBeat=ac.currentTime+0.1;
+  musicStep=0;
+  schedMusic();
+}
+function stopMusic(){musicPlaying=false;if(musicScheduler){clearTimeout(musicScheduler);musicScheduler=null;}}
+function toggleMute(){
+  muted=!muted;
+  const b=document.getElementById('btnMute');if(b)b.textContent=muted?'X':'S';
+  if(muted)stopMusic();else if(gameState==='playing'||gameState==='boss')startMusic();
+}
+function togglePause(){
+  if(gameState==='playing'||gameState==='boss'){
+    prevGameState=gameState;gameState='paused';stopMusic();
+    const b=document.getElementById('btnPause');if(b)b.textContent='P';
+  }else if(gameState==='paused'){
+    gameState=prevGameState;if(!muted)startMusic();
+    const b=document.getElementById('btnPause');if(b)b.textContent='II';
+  }
+}
+function drawPaused(){
+  ctx.fillStyle='rgba(0,0,0,0.62)';ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center';ctx.shadowColor='#4488ff';ctx.shadowBlur=28;
+  ctx.fillStyle='#fff';ctx.font='bold 64px Arial';
+  ctx.fillText('PAUSED',W/2,H/2-12);ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='20px Arial';
+  ctx.fillText('Press P / ESC  or tap  II  to continue',W/2,H/2+40);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function curWaveNum(){
@@ -148,8 +239,8 @@ function startGame(){
   gameState='playing';score=0;lives=3;stageIdx=0;
   weaponTier=0;killCount=0;cardsThisRound=0;
   P.x=W/2;P.cooldown=0;P.inv=0;
-  boss=null;bossTime=0;enemies=[];bullets=[];eBullets=[];particles=[];floatTexts=[];powerCards=[];
-  spawnWave(1);
+  boss=null;bossTime=0;bossQuote='';bossQuoteTimer=0;enemies=[];bullets=[];eBullets=[];particles=[];floatTexts=[];powerCards=[];stopMusic();
+  spawnWave(1);startMusic();
 }
 
 function spawnWave(num){
@@ -169,11 +260,11 @@ function spawnBossStage(num){
   enemies=[];bullets=[];eBullets=[];powerCards=[];
   eShootTimer=0;bossTime=0;
   const bw=150,bh=220;
-  const maxHp=num===1?80:150;
+  const maxHp=num===1?65:110;
   boss={
     x:W/2-bw/2,y:-bh,targetY:45,w:bw,h:bh,
     hp:maxHp,maxHp:maxHp,
-    dx:num===1?1.8:2.6,
+    dx:num===1?1.5:2.2,
     entering:true,
     shootTimer:0,specialTimer:0,warningActive:false,
     // HP threshold system
@@ -215,13 +306,13 @@ function spawnBossMiniBurgers(count){
 // ── Power-up ──────────────────────────────────────────────────────────────────
 function onEnemyKilled(e){
   e.dead=true;
-  sndMoo();const pts=10*curWaveNum();
+  const pts=10*curWaveNum();
   score+=pts;
   if(score>highScore){highScore=score;localStorage.setItem('burgerHS',highScore);}
   explode(e.x+e.w/2,e.y+e.h/2);
   floatTexts.push({x:e.x+e.w/2,y:e.y,text:'+'+pts,life:50,maxLife:50,big:false});
   killCount++;
-  if(killCount%10===0)
+  if(killCount%(gameState==='boss'?5:10)===0)
     powerCards.push({x:e.x+e.w/2,y:e.y+e.h/2,life:300,age:0,collected:false});
 }
 
@@ -255,10 +346,10 @@ function advanceStage(){
   stageIdx++;
   // ALWAYS reset weapon and card progress on stage change
   weaponTier=0;cardsThisRound=0;killCount=0;
-  if(stageIdx>=STAGES.length){gameState='win';sndWin();return;}
+  if(stageIdx>=STAGES.length){stopMusic();gameState='win';sndWin();return;}
   const s=STAGES[stageIdx];
-  if(s.type==='wave'){spawnWave(s.num);gameState='playing';}
-  else{spawnBossStage(s.num);bossEnterTimer=90;gameState='bossenter';sndBossEnter();}
+  if(s.type==='wave'){spawnWave(s.num);gameState='playing';if(!muted)startMusic();}
+  else{spawnBossStage(s.num);bossEnterTimer=90;gameState='bossenter';stopMusic();sndBossEnter();}
 }
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
@@ -268,7 +359,7 @@ function update(){
     shakeY=(Math.random()-0.5)*shakeInt*2;
     if(--shakeFrames===0){shakeX=0;shakeY=0;shakeInt=0;}
   }
-  if(gameState==='menu'||gameState==='gameover'||gameState==='win')return;
+  if(gameState==='menu'||gameState==='gameover'||gameState==='win'||gameState==='paused')return;
 
   STARS.forEach(s=>{s.y+=s.speed;if(s.y>H){s.y=0;s.x=Math.random()*W;}});
 
@@ -292,7 +383,7 @@ function update(){
     if(boss.y>=boss.targetY){
       boss.y=boss.targetY;boss.entering=false;
       spawnBossMiniBurgers(4);
-      gameState='boss';
+      gameState='boss';if(!muted)startMusic();setBossQuote(bossEnterQuotes[Math.floor(Math.random()*bossEnterQuotes.length)]);
     }
     return;
   }
@@ -316,7 +407,7 @@ function checkPlayerHit(){
   if(P.inv===0){
     eBullets=eBullets.filter(b=>{
       const hit=b.x>P.x-P.w/2&&b.x<P.x+P.w/2&&b.y>P.y-P.h/2&&b.y<P.y+P.h/2;
-      if(hit){lives--;P.inv=120;sndPlayerHit();triggerShake(18,7);explode(P.x,P.y,12);if(lives<=0){gameState='gameover';sndGameOver();}}
+      if(hit){lives--;P.inv=120;sndPlayerHit();triggerShake(18,7);explode(P.x,P.y,12);if(lives<=0){stopMusic();gameState='gameover';sndGameOver();}}
       return !hit;
     });
   }
@@ -356,7 +447,7 @@ function updateWave(){
       const step=10+num*5;
       enemies.forEach(e=>e.x+=eDir*step);
     }
-    if(Math.max.apply(null,alive.map(e=>e.y+e.h))>=P.y-10){gameState='gameover';sndGameOver();return;}
+    if(Math.max.apply(null,alive.map(e=>e.y+e.h))>=P.y-10){stopMusic();gameState='gameover';sndGameOver();return;}
   }
 
   // Enemy shoot — faster and multi-shooter at waves 4-6
@@ -395,9 +486,9 @@ function updateBoss(){
 
   // Phase-scaled intervals: faster as phases increase
   const phMult=Math.max(0.5,1-boss.phase*0.12);
-  const regularInt=Math.round(85*phMult);
+  const regularInt=Math.round(108*phMult);
   const specialInt=Math.round(200*phMult);
-  const burgerInt =Math.round(70*phMult);
+  const burgerInt =Math.round(95*phMult);
 
   // Boss regular shot
   boss.shootTimer++;
@@ -442,12 +533,12 @@ function updateBoss(){
 
       // HP threshold → escalating burger wave
       if(boss.hp>0&&boss.hp<=boss.nextPhaseHP){
-        boss.phase++;sndBossPhase();
+        boss.phase++;sndBossPhase();setBossQuote(bossPhaseQuotes[Math.min(boss.phase-1,bossPhaseQuotes.length-1)]);
         boss.nextPhaseHP=Math.round(boss.maxHp*(0.8-boss.phase*0.2));
         if(boss.nextPhaseHP<=0)boss.nextPhaseHP=-1;
         // Increase boss speed each phase
-        boss.dx=Math.sign(boss.dx)*Math.min(4,Math.abs(boss.dx)*1.18);
-        const newCount=4*(boss.phase+1); // 8,12,16,20
+        boss.dx=Math.sign(boss.dx)*Math.min(4,Math.abs(boss.dx)*1.1);
+        const newCount=4+boss.phase*3; // 8,12,16,20
         spawnBossMiniBurgers(newCount);
         floatTexts.push({x:W/2,y:H/2-20,
           text:'PHASE '+(boss.phase+1)+'! '+newCount+' BURGERS!',
@@ -459,7 +550,7 @@ function updateBoss(){
         sndBossDeath();explode(boss.x+boss.w/2,boss.y+boss.h/2,65);triggerShake(40,12);
         score+=500;if(score>highScore){highScore=score;localStorage.setItem('burgerHS',highScore);}
         boss=null;enemies=[];
-        clearBannerText='ITZIK DEFEATED! +500 BONUS!';
+        stopMusic();clearBannerText='ITZIK DEFEATED! +500 BONUS!';
         waveClearTimer=WAVE_CLEAR_DUR+60;gameState='bossclear';
       }
       return false;
@@ -478,7 +569,7 @@ function draw(){
     ctx.fillStyle='rgba(255,255,255,'+s.bright+')';
     ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
   });
-  if(gameState==='menu')drawMenu();
+  if(gameState==='paused'){drawPaused();ctx.restore();return;}if(gameState==='menu')drawMenu();
   else{
     drawScene();drawHUD();
     if(gameState==='bossenter')                          drawBossEnterBanner();
@@ -508,7 +599,7 @@ function drawScene(){
       ctx.globalAlpha=0.45;ctx.fillStyle='#ff0000';
       ctx.fillRect(boss.x,boss.y,boss.w,boss.h);ctx.globalAlpha=1;
     }
-    ctx.drawImage(bossImg,boss.x,boss.y,boss.w,boss.h);
+    ctx.drawImage(bossImg,boss.x,boss.y,boss.w,boss.h);drawBossQuote();
     drawBossHPBar();
   }
 
@@ -591,8 +682,8 @@ function drawHUD(){
     ctx.textAlign='right';ctx.fillStyle=wc;ctx.font='bold 15px Arial';
     ctx.shadowColor=wc;ctx.shadowBlur=8;ctx.fillText(wl,W-14,56);ctx.shadowBlur=0;
   }
-  const nextCard=10-(killCount%10);
-  if(nextCard<10){
+  const cInt=(gameState==='boss'?5:10);const nextCard=cInt-(killCount%cInt);
+  if(nextCard<cInt){
     ctx.textAlign='center';ctx.fillStyle='#aaa';ctx.font='13px Arial';
     ctx.fillText('Next card in '+nextCard+' kills',W/2,56);
   }
@@ -662,5 +753,6 @@ function loop(){update();draw();requestAnimationFrame(loop);}
   loop();
 })();
 </script>
+<div id="ctrlBtns" style="position:fixed;bottom:16px;right:16px;z-index:999;display:flex;gap:10px;"><button id="btnMute" onclick="toggleMute()" title="Mute (M)" style="background:rgba(0,0,0,0.75);color:#fff;border:2px solid #666;border-radius:8px;width:48px;height:48px;font-size:18px;cursor:pointer;touch-action:manipulation;">&#128266;</button><button id="btnPause" onclick="togglePause()" title="Pause (P)" style="background:rgba(0,0,0,0.75);color:#fff;border:2px solid #666;border-radius:8px;width:48px;height:48px;font-size:18px;cursor:pointer;touch-action:manipulation;">&#9646;&#9646;</button></div>
 </body>
 </html>
